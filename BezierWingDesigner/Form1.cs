@@ -3,10 +3,57 @@ using System;
 using System.Windows.Forms;
 using static Plot3D.Editor3D;
 
+using HtmlAgilityPack;
+//using System.Collections.Generic;
+//using System.Net.Http;
+using System.Threading.Tasks;
+using BezierAirfoilDesigner;
+using ScottPlot;
+
 namespace BezierWingDesigner
 {
     public partial class Form1 : Form
     {
+        readonly double minZoomRange = 0.01;
+        readonly double maxZoomRange = 250.0;
+
+        List<List<PointD>> planformControlPoints_LE = new()
+        {
+            new()
+            {
+                new PointD( 0.0, 0.0  ),
+                new PointD( 1.5, 0.0  ),
+                new PointD( 1.5,-0.35)
+            },
+
+            new()
+            {
+                new PointD( 0.0, 0.0  ),
+                new PointD(-1.5, 0.0  ),
+                new PointD(-1.5,-0.35)
+            }
+        };
+
+        List<List<PointD>> planformControlPoints_TE = new()
+        {
+            new()
+            {
+                new PointD( 0.0,-0.5  ),
+                new PointD( 1.5,-0.5  ),
+                new PointD( 1.5,-0.38)
+            },
+
+            new()
+            {
+                new PointD( 0.0,-0.5  ),
+                new PointD(-1.5,-0.5  ),
+                new PointD(-1.5,-0.38)
+            }
+        };
+
+        List<List<PointD>> planformCurvePoints_LE = new();
+        List<List<PointD>> planformCurvePoints_TE = new();
+
         public Form1()
         {
             InitializeComponent();
@@ -14,18 +61,113 @@ namespace BezierWingDesigner
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            calculations();
             DemoSurface(ePolygonMode.Fill);
         }
 
-        private void editor3d1_Load(object sender, EventArgs e)
+        private void Editor3d_Load(object sender, EventArgs e)
         {
             base.OnLoad(e);
-            editor3d1.Clear();
-            editor3d1.Recalculate(false);
-            editor3d1.MouseControl = eMouseCtrl.L_Theta_L_Phi;
-            editor3d1.Raster = eRaster.Off;
-            editor3d1.BackColor = Color.FromArgb(50, 50, 50);
-            editor3d1.TopLegendColor = Color.Empty;
+            Editor3d.Clear();
+            Editor3d.Recalculate(false);
+            Editor3d.MouseControl = eMouseCtrl.L_Theta_L_Phi;
+            //Editor3d.Raster = eRaster.Off;
+            Editor3d.BackColor = SystemColors.Control /*Color.FromArgb(50, 50, 50)*/;
+            Editor3d.TopLegendColor = Color.Empty;
+        }
+
+        private void formsPlot1_Load(object sender, EventArgs e)
+        {
+            formsPlot1.Plot.AxisScaleLock(enable: true, scaleMode: ScottPlot.EqualScaleMode.PreserveX);
+            formsPlot1.Configuration.RightClickDragZoom = false;
+
+            formsPlot1.Plot.XAxis.SetZoomInLimit(minimumSpan: 0.001);
+            formsPlot1.Plot.XAxis.SetZoomOutLimit(maximumSpan: 100);
+            //formsPlot1.Plot.XAxis.TickLabelNotation(invertSign: true);
+
+            formsPlot1.Plot.YAxis.SetZoomInLimit(minimumSpan: 0.001);
+            formsPlot1.Plot.YAxis.SetZoomOutLimit(maximumSpan: 100);
+            //formsPlot1.Plot.YAxis.TickLabelNotation(invertSign: true);
+        }
+
+        private void calculations()
+        {
+            //---------------------------------------------------------------------------------------------------------------------------------------
+            //---------------------------------------------------------------------------------------------------------------------------------------
+
+            for (int i = 0; i < planformControlPoints_LE.Count; i++)
+            {
+
+                planformCurvePoints_LE.Add(new List<PointD>());
+                planformCurvePoints_LE[i] = DeCasteljau.BezierCurve(planformControlPoints_LE[i], 150);
+
+                var plottedPlanformCurvePoints_LE = formsPlot1.Plot.AddScatterList(color: Color.Red, lineStyle: ScottPlot.LineStyle.Solid);
+
+                for (int k = 0; k < planformCurvePoints_LE[i].Count; k++)
+                {
+                    plottedPlanformCurvePoints_LE.Add(planformCurvePoints_LE[i][k].X, planformCurvePoints_LE[i][k].Y);
+                }
+                
+                //-----------------------------------------------------------------------------------------------------------------------------------
+
+                double[] xLE = new double[planformControlPoints_LE[i].Count];
+                double[] yLE = new double[planformControlPoints_LE[i].Count];
+
+                for (int j = 0; j < planformControlPoints_LE[i].Count; j++)
+                {
+                    xLE[j] = planformControlPoints_LE[i][j].X;
+                    yLE[j] = planformControlPoints_LE[i][j].Y;
+                }
+
+                var controlLE = new ScottPlot.Plottable.ScatterPlotListDraggable();
+                controlLE.AddRange(xLE, yLE);
+                controlLE.LineStyle = LineStyle.Dash;
+                controlLE.Color = Color.Gray;
+                controlLE.MarkerSize = 5;
+                formsPlot1.Plot.Add(controlLE);
+
+            }
+
+            //---------------------------------------------------------------------------------------------------------------------------------------
+            //---------------------------------------------------------------------------------------------------------------------------------------
+
+            for (int i = 0; i < planformControlPoints_TE.Count; i++)
+            {
+                planformCurvePoints_TE.Add(new List<PointD>());
+                planformCurvePoints_TE[i] = DeCasteljau.BezierCurve(planformControlPoints_TE[i], 150);
+
+                var plottedPlanformCurvePoints_TE = formsPlot1.Plot.AddScatterList(color: Color.Red, lineStyle: ScottPlot.LineStyle.Solid);
+
+                for (int k = 0; k < planformCurvePoints_TE[i].Count; k++)
+                {
+                    plottedPlanformCurvePoints_TE.Add(planformCurvePoints_TE[i][k].X, planformCurvePoints_TE[i][k].Y);
+                }
+
+                //-----------------------------------------------------------------------------------------------------------------------------------
+
+                double[] xTE = new double[planformControlPoints_TE[i].Count];
+                double[] yTE = new double[planformControlPoints_TE[i].Count];
+
+                for (int j = 0; j < planformControlPoints_TE[i].Count; j++)
+                {
+                    xTE[j] = planformControlPoints_TE[i][j].X;
+                    yTE[j] = planformControlPoints_TE[i][j].Y;
+                }
+
+                var controlTE = new ScottPlot.Plottable.ScatterPlotListDraggable();
+                controlTE.AddRange(xTE, yTE);
+                controlTE.LineStyle = LineStyle.Dash;
+                controlTE.Color = Color.Gray;
+                controlTE.MarkerSize = 5;
+                formsPlot1.Plot.Add(controlTE);
+
+            }
+
+            //---------------------------------------------------------------------------------------------------------------------------------------
+            //---------------------------------------------------------------------------------------------------------------------------------------
+
+            formsPlot1.Plot.AxisAuto();
+            formsPlot1.Refresh();
         }
 
         private void DemoSurface(ePolygonMode e_Mode)
@@ -87,11 +229,30 @@ namespace BezierWingDesigner
 
             // In Line mode the pen is used to draw the polygon border lines. The color is assigned from the ColorScheme.
             // In Fill mode the pen is used to draw the thin separator lines (always 1 pixel, black)
-            Pen i_Pen = (e_Mode == ePolygonMode.Lines) ? new Pen(Color.Yellow, 2) : Pens.Transparent;
+            Pen? i_Pen = (e_Mode == ePolygonMode.Lines) ? new Pen(Color.Yellow, 2) : null;
 
             cColorScheme i_Scheme = new cColorScheme(Plot3D.Editor3D.eColorScheme.Hot);
             cSurfaceData i_Data = new cSurfaceData(e_Mode, s32_Cols, s32_Rows, i_Pen, i_Scheme);
             cSurfaceData i_Data2 = new cSurfaceData(e_Mode, s32_Cols, s32_Rows, i_Pen, i_Scheme);
+
+            //cSurfaceData planform = new cSurfaceData(e_Mode, 4, planformCurvePoints_LE[0].Count * 2, i_Pen, i_Scheme);
+
+            //for (int i = 0; i < planformCurvePoints_LE.Count; i++)
+            //{
+            //    for (int j = planformCurvePoints_LE[i].Count; j > 0; j--)
+            //    {
+            //        double d_X = planformCurvePoints_LE[i][j].X;
+            //        double d_Y = planformCurvePoints_LE[i][j].Y;
+            //        double d_Z = 0;
+
+            //        //String s_Tooltip = String.Format("Col = {0}\nRow = {1}\nRaw Value = {2}", d_X, d_Y, d_Z);
+            //        cPoint3D i_Point = new cPoint3D(d_X, d_Y, d_Z, null, d_Z);
+            //        //cPoint3D i_Point2 = new cPoint3D(d_X, d_Y, d_Z + 0.1, null, d_Z);
+
+            //        planform.SetPointAt(i*(j+1), j, i_Point);
+            //        //planform.SetPointAt(i, j, i_Point2);
+            //    }
+            //}
 
             for (int C = 0; C < i_Data.Cols; C++)
             {
@@ -112,16 +273,19 @@ namespace BezierWingDesigner
                 }
             }
 
-            editor3d1.Clear();
-            editor3d1.Normalize = eNormalize.MaintainXYZ;
-            editor3d1.AddRenderData(i_Data); editor3d1.AddRenderData(i_Data2);
+            Editor3d.Clear();
+            Editor3d.Normalize = eNormalize.MaintainXYZ;
+            Editor3d.AddRenderData(i_Data);
+            Editor3d.AddRenderData(i_Data2);
+
+            //Editor3d.AddRenderData(planform);
 
             //editor3d1.Selection.Callback = OnSelectEvent;
-            editor3d1.Selection.HighlightColor = Color.FromArgb(100, 100, 100);
-            editor3d1.Selection.MultiSelect = true;
+            Editor3d.Selection.HighlightColor = Color.FromArgb(100, 100, 100);
+            Editor3d.Selection.MultiSelect = true;
             //editor3d1.Selection.Enabled = true;
-            editor3d1.Recalculate(true);
-            editor3d1.TooltipMode = eTooltip.Off;
+            Editor3d.Recalculate(true);
+            Editor3d.TooltipMode = eTooltip.Off;
 
             // Single point selection works only in Fill mode
             //if (e_Mode == ePolygonMode.Lines)
@@ -146,10 +310,24 @@ namespace BezierWingDesigner
             //}
         }
 
-        private void Form1_SizeChanged(object sender, EventArgs e)
+        private void Form1_SizeChanged(object? sender, EventArgs? e)
         {
-            editor3d1.Height = this.ClientSize.Height /*- editor3d1.Top * 2*/;
-            editor3d1.Width = this.ClientSize.Width /*- editor3d1.Left * 2*/;
+            tabControl1.Height = this.ClientSize.Height /*- editor3d1.Top * 2*/;
+            tabControl1.Width = this.ClientSize.Width /*- editor3d1.Left * 2*/;
+
+            Editor3d.Height = tab3DView.Height - Editor3d.Top * 2;
+            Editor3d.Width = tab3DView.Width - Editor3d.Left * 2;
+
+            formsPlot1.Height = tabPlanformView.Height - formsPlot1.Top * 2;
+            formsPlot1.Width = tabPlanformView.Width - formsPlot1.Left * 2;
         }
+
+        private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            DemoSurface(ePolygonMode.Fill);
+            Form1_SizeChanged(sender: null, e: null);
+        }
+
+
     }
 }

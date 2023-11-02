@@ -2884,7 +2884,7 @@ namespace Plot3D
         // The mouse factor defines how much mouse movement you need for a change.
         // A movement of mouse by approx 1000 pixels on the screen results in getting from Min to Max or vice versa.
         static readonly cDefault VALUES_RHO   = new cDefault(250,   2500,  2000,    2   );
-        static readonly cDefault VALUES_THETA = new cDefault(  0,    180,    70,    0.25); // degree
+        static readonly cDefault VALUES_THETA = new cDefault( 10,    170,    70,    0.25); // degree
         static readonly cDefault VALUES_PHI   = new cDefault(  0,    360,   230,    0.4 ); // degree  (continuous rotation)
 
         // The axis are 10% longer than the highest X,Y,Z value
