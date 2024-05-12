@@ -24,7 +24,7 @@ namespace BezierAirfoilDesigner
                 {
                     double x = (1 - (double)t) * points[i].X + (double)t * points[i + 1].X;
                     double y = (1 - (double)t) * points[i].Y + (double)t * points[i + 1].Y;
-                    points[i] = new PointD(x, y);
+                    points[i] = new PointD(x, y, 0.0);
                 }
             }
 
@@ -58,7 +58,7 @@ namespace BezierAirfoilDesigner
                 double x = (i * controlPoints[i - 1].X + (n - i + 1) * controlPoints[i].X) / (n + 1);
                 double y = (i * controlPoints[i - 1].Y + (n - i + 1) * controlPoints[i].Y) / (n + 1);
 
-                increasedControlPoints.Add(new PointD(x, y));
+                increasedControlPoints.Add(new PointD(x, y, 0.0));
             }
 
             increasedControlPoints.Add(controlPoints[n]);
@@ -80,7 +80,7 @@ namespace BezierAirfoilDesigner
                 double x = ((n + 1) * controlPoints[i].X - i * decreasedControlPoints[i - 1].X) / (n - i + 1);
                 double y = ((n + 1) * controlPoints[i].Y - i * decreasedControlPoints[i - 1].Y) / (n - i + 1);
 
-                decreasedControlPoints.Add(new PointD(x, y));
+                decreasedControlPoints.Add(new PointD(x, y, 0.0));
             }
 
             decreasedControlPoints[decreasedControlPoints.Count - 1] = controlPoints[controlPoints.Count - 1];
@@ -117,7 +117,7 @@ namespace BezierAirfoilDesigner
                     x += K[i, j] * pts[j].X;
                     y += K[i, j] * pts[j].Y;
                 }
-                result[i] = new PointD(x, y);
+                result[i] = new PointD(x, y, 0.0);
             }
 
             result[0] = controlPoints[0];

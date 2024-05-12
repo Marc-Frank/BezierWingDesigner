@@ -9,50 +9,112 @@ using HtmlAgilityPack;
 using System.Threading.Tasks;
 using BezierAirfoilDesigner;
 using ScottPlot;
+using System.Text.Json.Nodes;
+
+using System.Text.Json;
+using System.IO;
+using System.Globalization;
 
 namespace BezierWingDesigner
 {
     public partial class Form1 : Form
     {
         readonly double minZoomRange = 0.01;
-        readonly double maxZoomRange = 250.0;
+        readonly double maxZoomRange = 2500.0;
 
-        List<List<PointD>> planformControlPoints_LE = new()
+        static int number_of_points_per_planform_section = 25;
+        static int number_of_points_per_airfoil_half = 25;
+
+        static double k = 0.551784777779014;
+        static double span = 2000.0;
+        static double root_chord = 250.0;
+        static double tip_chord = root_chord * 0.05;
+        static double hinge_position_fraction = 0.75;
+        static double sweep = 0.0;
+        static double trailing_edge_thickness = 0.5;
+
+        static double hinge_position = root_chord * hinge_position_fraction;
+        static double tip_LE_position = -hinge_position + tip_chord * hinge_position_fraction;
+        static double tip_TE_position = -hinge_position - tip_chord * hinge_position_fraction;
+        static double LE_tip_control_point_position = tip_LE_position * (1-k);
+        static double TE_tip_control_point_position = tip_TE_position - (Math.Abs(root_chord) - Math.Abs(tip_TE_position)) * k;
+        
+        List<List<PointD>> planform_control_points_LE = new()
         {
             new()
             {
-                new PointD( 0.0, 0.0  ),
-                new PointD( 1.5, 0.0  ),
-                new PointD( 1.5,-0.35)
+                new PointD(span / 2, tip_LE_position - sweep, 0.0),
+                new PointD(span / 2, LE_tip_control_point_position - sweep, 0.0),
+                new PointD(span / 2 * k, 0.0 - sweep * k, 0.0),
+                new PointD(0.0, 0.0, 0.0)
             },
 
             new()
             {
-                new PointD( 0.0, 0.0  ),
-                new PointD(-1.5, 0.0  ),
-                new PointD(-1.5,-0.35)
+                new PointD(0.0, 0.0, 0.0),
+                new PointD(-span / 2 * k, 0.0 - sweep * k, 0.0),
+                new PointD(-span / 2, LE_tip_control_point_position - sweep, 0.0),
+                new PointD(-span / 2, tip_LE_position - sweep, 0.0)
             }
         };
 
-        List<List<PointD>> planformControlPoints_TE = new()
+        List<List<PointD>> planform_control_points_TE = new()
         {
             new()
             {
-                new PointD( 0.0,-0.5  ),
-                new PointD( 1.5,-0.5  ),
-                new PointD( 1.5,-0.38)
+                new PointD(span / 2, tip_TE_position - sweep, 0.0),
+                new PointD(span / 2, TE_tip_control_point_position - sweep, 0.0),
+                new PointD(span / 2 * k,-root_chord - sweep * k, 0.0),
+                new PointD(0.0,-root_chord, 0.0)
             },
 
             new()
             {
-                new PointD( 0.0,-0.5  ),
-                new PointD(-1.5,-0.5  ),
-                new PointD(-1.5,-0.38)
+                new PointD(0.0,-root_chord, 0.0),
+                new PointD(-span / 2 * k,-root_chord - sweep * k, 0.0),
+                new PointD(-span / 2, TE_tip_control_point_position - sweep, 0.0),
+                new PointD(-span / 2, tip_TE_position - sweep, 0.0)
             }
         };
 
-        List<List<PointD>> planformCurvePoints_LE = new();
-        List<List<PointD>> planformCurvePoints_TE = new();
+        List<List<PointD>> planform_curve_points_LE = new();
+        List<List<PointD>> planform_curve_points_TE = new();
+
+        List<List<PointD>> airfoil_control_points = new()
+        {
+            new()
+            {
+                new PointD(0.0000000000000000, 0.0000000000000000, 0.0),
+                new PointD(0.0000000000000000, 0.0144573876738672, 0.0),
+                new PointD(0.0251460394591507, 0.0480767745161672, 0.0),
+                new PointD(0.1721424698113208, 0.0824041004345160, 0.0),
+                new PointD(0.2629447173668014, 0.0364800606824565, 0.0),
+                new PointD(0.3454587070825096, 0.0770102150648193, 0.0),
+                new PointD(0.5009103749509788, 0.0308643354578807, 0.0),
+                new PointD(0.6500196391789768, 0.0472797622262542, 0.0),
+                new PointD(0.8395576066138191, -0.0023389811838496, 0.0),
+                new PointD(1.0000000000000000, 0.0000000000000000, 0.0)
+            },
+
+            new()
+            {
+                new PointD(0.0000000000000000, 0.0000000000000000, 0.0),
+                new PointD(0.0000000000000000, -0.0156856296667000, 0.0),
+                new PointD(0.0736697495772509, -0.0232710679838285, 0.0),
+                new PointD(0.0911912282645849, -0.0184253299121407, 0.0),
+                new PointD(0.2081271911545573, -0.0438452783245577, 0.0),
+                new PointD(0.3566147730075391, -0.0083193958204370, 0.0),
+                new PointD(0.5371624584890762, -0.0333758439323835, 0.0),
+                new PointD(0.6688111284887106, -0.0056767542357767, 0.0),
+                new PointD(0.8150091377358929, -0.0119037158553079, 0.0),
+                new PointD(1.0000000000000000, 0.0000000000000000, 0.0)
+            }
+        };
+
+        List<List<PointD>> airfoil_curve_points = new();
+
+        List<List<PointD>> surface_points = new();
+        List<List<PointD>> stl_surface_points = new();
 
         public Form1()
         {
@@ -71,7 +133,7 @@ namespace BezierWingDesigner
             Editor3d.Clear();
             Editor3d.Recalculate(false);
             Editor3d.MouseControl = eMouseCtrl.L_Theta_L_Phi;
-            //Editor3d.Raster = eRaster.Off;
+            Editor3d.Raster = eRaster.Off;
             Editor3d.BackColor = SystemColors.Control /*Color.FromArgb(50, 50, 50)*/;
             Editor3d.TopLegendColor = Color.Empty;
         }
@@ -81,12 +143,12 @@ namespace BezierWingDesigner
             formsPlot1.Plot.AxisScaleLock(enable: true, scaleMode: ScottPlot.EqualScaleMode.PreserveX);
             formsPlot1.Configuration.RightClickDragZoom = false;
 
-            formsPlot1.Plot.XAxis.SetZoomInLimit(minimumSpan: 0.001);
-            formsPlot1.Plot.XAxis.SetZoomOutLimit(maximumSpan: 100);
+            formsPlot1.Plot.XAxis.SetZoomInLimit(minimumSpan: minZoomRange);
+            formsPlot1.Plot.XAxis.SetZoomOutLimit(maximumSpan: maxZoomRange);
             //formsPlot1.Plot.XAxis.TickLabelNotation(invertSign: true);
 
-            formsPlot1.Plot.YAxis.SetZoomInLimit(minimumSpan: 0.001);
-            formsPlot1.Plot.YAxis.SetZoomOutLimit(maximumSpan: 100);
+            formsPlot1.Plot.YAxis.SetZoomInLimit(minimumSpan: minZoomRange);
+            formsPlot1.Plot.YAxis.SetZoomOutLimit(maximumSpan: maxZoomRange);
             //formsPlot1.Plot.YAxis.TickLabelNotation(invertSign: true);
         }
 
@@ -94,29 +156,30 @@ namespace BezierWingDesigner
         {
             //---------------------------------------------------------------------------------------------------------------------------------------
             //---------------------------------------------------------------------------------------------------------------------------------------
+            // 
 
-            for (int i = 0; i < planformControlPoints_LE.Count; i++)
+            for (int i = 0; i < planform_control_points_LE.Count; i++)
             {
 
-                planformCurvePoints_LE.Add(new List<PointD>());
-                planformCurvePoints_LE[i] = DeCasteljau.BezierCurve(planformControlPoints_LE[i], 150);
+                planform_curve_points_LE.Add(new List<PointD>());
+                planform_curve_points_LE[i] = DeCasteljau.BezierCurve(planform_control_points_LE[i], number_of_points_per_planform_section);
 
                 var plottedPlanformCurvePoints_LE = formsPlot1.Plot.AddScatterList(color: Color.Red, lineStyle: ScottPlot.LineStyle.Solid);
 
-                for (int k = 0; k < planformCurvePoints_LE[i].Count; k++)
+                for (int k = 0; k < planform_curve_points_LE[i].Count; k++)
                 {
-                    plottedPlanformCurvePoints_LE.Add(planformCurvePoints_LE[i][k].X, planformCurvePoints_LE[i][k].Y);
+                    plottedPlanformCurvePoints_LE.Add(planform_curve_points_LE[i][k].X, planform_curve_points_LE[i][k].Y);
                 }
                 
                 //-----------------------------------------------------------------------------------------------------------------------------------
 
-                double[] xLE = new double[planformControlPoints_LE[i].Count];
-                double[] yLE = new double[planformControlPoints_LE[i].Count];
+                double[] xLE = new double[planform_control_points_LE[i].Count];
+                double[] yLE = new double[planform_control_points_LE[i].Count];
 
-                for (int j = 0; j < planformControlPoints_LE[i].Count; j++)
+                for (int j = 0; j < planform_control_points_LE[i].Count; j++)
                 {
-                    xLE[j] = planformControlPoints_LE[i][j].X;
-                    yLE[j] = planformControlPoints_LE[i][j].Y;
+                    xLE[j] = planform_control_points_LE[i][j].X;
+                    yLE[j] = planform_control_points_LE[i][j].Y;
                 }
 
                 var controlLE = new ScottPlot.Plottable.ScatterPlotListDraggable();
@@ -131,27 +194,27 @@ namespace BezierWingDesigner
             //---------------------------------------------------------------------------------------------------------------------------------------
             //---------------------------------------------------------------------------------------------------------------------------------------
 
-            for (int i = 0; i < planformControlPoints_TE.Count; i++)
+            for (int i = 0; i < planform_control_points_TE.Count; i++)
             {
-                planformCurvePoints_TE.Add(new List<PointD>());
-                planformCurvePoints_TE[i] = DeCasteljau.BezierCurve(planformControlPoints_TE[i], 150);
+                planform_curve_points_TE.Add(new List<PointD>());
+                planform_curve_points_TE[i] = DeCasteljau.BezierCurve(planform_control_points_TE[i], number_of_points_per_planform_section);
 
                 var plottedPlanformCurvePoints_TE = formsPlot1.Plot.AddScatterList(color: Color.Red, lineStyle: ScottPlot.LineStyle.Solid);
 
-                for (int k = 0; k < planformCurvePoints_TE[i].Count; k++)
+                for (int k = 0; k < planform_curve_points_TE[i].Count; k++)
                 {
-                    plottedPlanformCurvePoints_TE.Add(planformCurvePoints_TE[i][k].X, planformCurvePoints_TE[i][k].Y);
+                    plottedPlanformCurvePoints_TE.Add(planform_curve_points_TE[i][k].X, planform_curve_points_TE[i][k].Y);
                 }
 
                 //-----------------------------------------------------------------------------------------------------------------------------------
 
-                double[] xTE = new double[planformControlPoints_TE[i].Count];
-                double[] yTE = new double[planformControlPoints_TE[i].Count];
+                double[] xTE = new double[planform_control_points_TE[i].Count];
+                double[] yTE = new double[planform_control_points_TE[i].Count];
 
-                for (int j = 0; j < planformControlPoints_TE[i].Count; j++)
+                for (int j = 0; j < planform_control_points_TE[i].Count; j++)
                 {
-                    xTE[j] = planformControlPoints_TE[i][j].X;
-                    yTE[j] = planformControlPoints_TE[i][j].Y;
+                    xTE[j] = planform_control_points_TE[i][j].X;
+                    yTE[j] = planform_control_points_TE[i][j].Y;
                 }
 
                 var controlTE = new ScottPlot.Plottable.ScatterPlotListDraggable();
@@ -166,9 +229,208 @@ namespace BezierWingDesigner
             //---------------------------------------------------------------------------------------------------------------------------------------
             //---------------------------------------------------------------------------------------------------------------------------------------
 
+            for (int i = 0; i < airfoil_control_points.Count; i++)
+            {
+                airfoil_curve_points.Add(new List<PointD>());
+                airfoil_curve_points[i] = DeCasteljau.BezierCurve(airfoil_control_points[i], number_of_points_per_airfoil_half);
+
+                var plotted_airfoil_curve_points = formsPlot1.Plot.AddScatterList(color: Color.Red, lineStyle: ScottPlot.LineStyle.Solid);
+
+                for (int k = 0; k < airfoil_curve_points[i].Count; k++)
+                {
+                    plotted_airfoil_curve_points.Add(airfoil_curve_points[i][k].X, airfoil_curve_points[i][k].Y + 0.25);
+                }
+
+                //-----------------------------------------------------------------------------------------------------------------------------------
+
+                double[] xTE = new double[airfoil_control_points[i].Count];
+                double[] yTE = new double[airfoil_control_points[i].Count];
+
+                for (int j = 0; j < airfoil_control_points[i].Count; j++)
+                {
+                    xTE[j] = airfoil_control_points[i][j].X;
+                    yTE[j] = airfoil_control_points[i][j].Y + 0.25;
+                }
+
+                var control_airfoil = new ScottPlot.Plottable.ScatterPlotListDraggable();
+                control_airfoil.AddRange(xTE, yTE);
+                control_airfoil.LineStyle = LineStyle.Dash;
+                control_airfoil.Color = Color.Gray;
+                control_airfoil.MarkerSize = 5;
+                formsPlot1.Plot.Add(control_airfoil);
+
+            }
+
+            //---------------------------------------------------------------------------------------------------------------------------------------
+            //---------------------------------------------------------------------------------------------------------------------------------------
+
+            surface_points.Add(new List<PointD>()); // List for top surface points
+            surface_points.Add(new List<PointD>()); // List for bottom surface points
+            
+            stl_surface_points.Add(new List<PointD>()); // List for top surface points
+            stl_surface_points.Add(new List<PointD>()); // List for bottom surface points
+
+            // Loop over the planform sections
+            for (int planform_section_index = 0; planform_section_index < planform_curve_points_LE.Count; planform_section_index++)
+            {
+                List<PointD> planform_section = planform_curve_points_LE[planform_section_index];
+
+                for (int planform_point_index = 0; planform_point_index < planform_section.Count; planform_point_index++)
+                {
+                    PointD planform_point = planform_section[planform_point_index];
+                    PointD tePoint = planform_curve_points_TE[planform_section_index][planform_point_index];
+
+                    double local_chord = Math.Abs(planform_point.Y) - Math.Abs(tePoint.Y);
+
+                    // Iterate over the points in the first list (top surface)
+                    for (int i = 0; i < airfoil_curve_points[0].Count; i++)
+                    {
+                        PointD airfoil_point = airfoil_curve_points[0][i];
+
+                        double x = planform_point.X;
+                        double y = airfoil_point.X * local_chord + planform_point.Y;
+                        double z = -airfoil_point.Y * local_chord + trailing_edge_thickness / 2 * airfoil_point.X;
+
+                        // Add the surface point to the top surface list within surface_points
+                        surface_points[0].Add(new PointD(x, y, z));
+                    }
+
+
+                    // Iterate over the points in the second list (bottom surface)
+                    for (int i = 0; i < airfoil_curve_points[1].Count; i++)
+                    {
+                        PointD airfoil_point = airfoil_curve_points[1][i];
+
+                        double x = planform_point.X;
+                        double y = airfoil_point.X * local_chord + planform_point.Y;
+                        double z = -airfoil_point.Y * local_chord - trailing_edge_thickness / 2 * airfoil_point.X;
+
+                        // Add the surface point to the top surface list within surface_points
+                        surface_points[1].Add(new PointD(x, y, z));
+                    }
+                }
+            }
+
+
+            //---------------------------------------------------------------------------------------------------------------------------------------
+            //---------------------------------------------------------------------------------------------------------------------------------------
+
             formsPlot1.Plot.AxisAuto();
             formsPlot1.Refresh();
+
+            // Call the function to write the surface points as an STL file
+            WriteSTLFile(surface_points, "wing_surface.stl");
+
+            // Create a JSON array to store surface points
+            JsonArray surfacePoints = new JsonArray();
+
+            // Iterate over the surface points lists
+            foreach (List<PointD> surfaceList in surface_points)
+            {
+                foreach (PointD point in surfaceList)
+                {
+                    // Create a JSON object for each surface point and add it to the JSON array
+                    JsonObject pointObject = new JsonObject();
+                    pointObject["x"] = point.X.ToString(CultureInfo.InvariantCulture);
+                    pointObject["y"] = point.Y.ToString(CultureInfo.InvariantCulture);
+                    pointObject["z"] = point.Z.ToString(CultureInfo.InvariantCulture);
+                    surfacePoints.Add(pointObject);
+                }
+            }
+
+            // Specify the file path where you want to save the JSON array
+            string filePath = "surfacePoints.json";
+
+            // Write the JSON array to the specified file path
+            File.WriteAllText(filePath, surfacePoints.ToString());
         }
+
+        // Function to write a single STL triangle to a stream
+        void WriteSTLTriangle(StreamWriter writer, PointD p1, PointD p2, PointD p3, bool invert_normal)
+        {
+            // If invertNormal is true, invert the point order
+            if (invert_normal)
+            {
+                PointD temp = p1;
+                p1 = p3;
+                p3 = temp;
+            }
+
+            // Calculate the vectors of the triangle
+            double[] u = { p2.X - p1.X, p2.Y - p1.Y, p2.Z - p1.Z };
+            double[] v = { p3.X - p1.X, p3.Y - p1.Y, p3.Z - p1.Z };
+
+            // Calculate the normal vector
+            double[] normal = {
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0]
+            };
+
+            // Normalize the normal vector
+            double length = Math.Sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+            normal[0] /= length;
+            normal[1] /= length;
+            normal[2] /= length;
+
+            // Write the facet and normal
+            writer.WriteLine($"facet normal {normal[0].ToString(CultureInfo.InvariantCulture)} {normal[1].ToString(CultureInfo.InvariantCulture)} {normal[2].ToString(CultureInfo.InvariantCulture)}");
+            writer.WriteLine("  outer loop");
+
+            // Write the vertices of the triangle
+            writer.WriteLine($"    vertex {p1.X.ToString(CultureInfo.InvariantCulture)} {p1.Y.ToString(CultureInfo.InvariantCulture)} {p1.Z.ToString(CultureInfo.InvariantCulture)}");
+            writer.WriteLine($"    vertex {p2.X.ToString(CultureInfo.InvariantCulture)} {p2.Y.ToString(CultureInfo.InvariantCulture)} {p2.Z.ToString(CultureInfo.InvariantCulture)}");
+            writer.WriteLine($"    vertex {p3.X.ToString(CultureInfo.InvariantCulture)} {p3.Y.ToString(CultureInfo.InvariantCulture)} {p3.Z.ToString(CultureInfo.InvariantCulture)}");
+
+            writer.WriteLine("  endloop");
+            writer.WriteLine("endfacet");
+        }
+
+
+        void WriteSTLFile(List<List<PointD>> surfacePoints, string filePath)
+        {
+            using (StreamWriter writer = new StreamWriter(filePath))
+            {
+                // Write the header of the STL file
+                writer.WriteLine("solid surface");
+
+                // Iterate over each surface (assuming it's composed of triangles)
+                for (int point_list_index = 0; point_list_index < surfacePoints.Count; point_list_index++)
+                {
+                    List<PointD> point_list = surfacePoints[point_list_index];
+                    int numRows = (point_list.Count - 1) / number_of_points_per_airfoil_half; // Calculate the number of rows
+                    int numCols = number_of_points_per_airfoil_half; // Number of columns
+
+                    // Write triangles row by row
+                    for (int row = 0; row < numRows; row++)
+                    {
+                        for (int col = 0; col < numCols - 1; col++)
+                        {
+                            // Calculate the indices of the points for the current triangle
+                            int idx1 = row * number_of_points_per_airfoil_half + col;
+                            int idx2 = row * number_of_points_per_airfoil_half + col + 1;
+                            int idx3 = (row + 1) * number_of_points_per_airfoil_half + col;
+
+                            // Write each triangle of the surface as an STL facet
+                            if (point_list_index == 0) WriteSTLTriangle(writer, point_list[idx1], point_list[idx2], point_list[idx3], true);
+                            else WriteSTLTriangle(writer, point_list[idx1], point_list[idx2], point_list[idx3], false);
+
+                            // Write the next triangle
+                            idx1 = row * number_of_points_per_airfoil_half + col + 1;
+                            idx2 = (row + 1) * number_of_points_per_airfoil_half + col + 1;
+                            idx3 = (row + 1) * number_of_points_per_airfoil_half + col;
+
+                            if (point_list_index == 0) WriteSTLTriangle(writer, point_list[idx1], point_list[idx2], point_list[idx3], true);
+                            else WriteSTLTriangle(writer, point_list[idx1], point_list[idx2], point_list[idx3], false);
+                        }
+                    }
+                }
+
+                // Write the end of the STL file
+                writer.WriteLine("endsolid surface");
+            }
+        }
+
 
         private void DemoSurface(ePolygonMode e_Mode)
         {
@@ -229,9 +491,9 @@ namespace BezierWingDesigner
 
             // In Line mode the pen is used to draw the polygon border lines. The color is assigned from the ColorScheme.
             // In Fill mode the pen is used to draw the thin separator lines (always 1 pixel, black)
-            Pen? i_Pen = (e_Mode == ePolygonMode.Lines) ? new Pen(Color.Yellow, 2) : null;
+            Pen? i_Pen = (e_Mode == ePolygonMode.Fill) ? new Pen(Color.Black, 2) : null;
 
-            cColorScheme i_Scheme = new cColorScheme(Plot3D.Editor3D.eColorScheme.Hot);
+            cColorScheme i_Scheme = new cColorScheme(Plot3D.Editor3D.eColorScheme.Monochrome);
             cSurfaceData i_Data = new cSurfaceData(e_Mode, s32_Cols, s32_Rows, i_Pen, i_Scheme);
             cSurfaceData i_Data2 = new cSurfaceData(e_Mode, s32_Cols, s32_Rows, i_Pen, i_Scheme);
 

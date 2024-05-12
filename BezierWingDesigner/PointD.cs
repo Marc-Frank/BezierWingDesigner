@@ -11,10 +11,13 @@ namespace BezierAirfoilDesigner
         public double X { get; set; }
         public double Y { get; set; }
 
-        public PointD(double x, double y)
+        public double Z { get; set; }
+
+        public PointD(double x, double y, double z)
         {
             X = x;
             Y = y;
+            Z = z;
         }
 
         public PointD()
@@ -26,7 +29,7 @@ namespace BezierAirfoilDesigner
             if (other == null)
                 return false;
 
-            return X == other.X && Y == other.Y;
+            return X == other.X && Y == other.Y && Z == other.Z;
         }
 
         public override bool Equals(object obj)
@@ -39,7 +42,7 @@ namespace BezierAirfoilDesigner
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(X, Y);
+            return HashCode.Combine(X, Y, Z);
         }
     }
 }
